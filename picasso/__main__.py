@@ -890,7 +890,7 @@ def _localize(args):
 
             try:
                 with open(zpath, "r") as f:
-                    z_calibration = yaml.load(f)
+                    z_calibration = yaml.load(f, Loader=yaml.Loader) # Loek: Added a Loader to avoid error
             except Exception as e:
                 print(e)
                 print("Error loading calibration file.")
@@ -1005,19 +1005,23 @@ def _localize(args):
                 print("Done.")
                 print("\n")
 
-            if args.drift > 0:
+            if args.drift > 0: 
                 print("Undrifting file:")
                 print("------------------------------------------")
-                try:
-                    _undrift(out_path, args.drift, display=False, fromfile=None)
-                except Exception as e:
-                    print(e)
-                    print("Drift correction failed for {}".format(out_path))
-
-            print("                                          ")
-    else:
-        print("Error. No files found.")
-        raise FileNotFoundError
+                ## Loek: I added iterative drift correction if the first attempt fails
+                for i in range(5):  # Try drift correction up to 5 times
+                    try:
+                        drift_value = args.drift + i * 250
+                        _undrift(f"{drift_value}{out_path}", drift_value, display=False, fromfile=None)
+                        
+                        break  # If successful, exit the loop
+                    except Exception as e:
+                        print(f"Attempt {i+1} failed, try with segmentation size {drift_value+250}: {e}")
+                else:
+                    print("All drift correction attempts failed for {}".format(out_path))
+            else:
+                print("Error. No files found.")
+                raise FileNotFoundError
 
 
 def _render(args):
